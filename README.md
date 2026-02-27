@@ -46,7 +46,7 @@ The simulation follows a **M/M/N queuing model**:
 ```bash
 # 1. Clone the repository
 git clone <repo-url>
-cd data_center_sim
+cd Data_Center_Simulation
 
 # 2. (Recommended) Create a virtual environment
 python -m venv .venv
