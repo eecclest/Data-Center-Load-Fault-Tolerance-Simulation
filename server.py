@@ -5,6 +5,7 @@ ClientRequests and processes the mone at a time using an exponential
 service time distribution.
 """
 
+import random
 from collections import deque
 from request import ClientRequest
 
@@ -30,20 +31,28 @@ class ServerNode:
     """
 
     def __init__(self, server_id: int, service_rate: float):
+
+        self.is_active = True
         self.server_id: int = server_id
-        self.service_rate: float = service_rate         # u
+        self.service_rate: float = service_rate
         self.queue: deque[ClientRequest] = deque()
         self.current_request: ClientRequest | None = None
+        self.total_busy_time = 0
+        self._completed: list[ClientRequest] = []
 
-        # Internal book-keeping
-        self._completed: list[ClientRequest] = []       # Finished this run
+        self.failed: bool = False
+        self.recovered: bool = False
+        self.recovery_time: float | None = None
+        self.total_failures: int = 0
 
     # ------------------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------------------
 
-    def enqueue(self, request: ClientRequest) -> None:
+    def enqueue(self, request: ClientRequest) -> bool | None:
         """Add a new request to the server's waiting queue."""
+        if not self.is_active:
+            return False
         self.queue.append(request)
 
     def queue_length(self) -> int:
@@ -86,8 +95,10 @@ class ServerNode:
         if self.current_request is None and self.queue:
             next_req = self.queue.popleft()
             next_req.start_service_time = current_time
+            service_time = random.expovariate(self.service_rate)
+            self.total_busy_time += service_time
             # completion schedled based on pre-drawn service_time
-            next_req.completion_time = current_time + next_req.service_time
+            next_req.completion_time = current_time + service_time
             self.current_request = next_req
 
         return completed_this_tick
@@ -107,6 +118,46 @@ class ServerNode:
         self.queue = remaining
         return timed_out
     
+    def apply_failure_model(self, current_time: float, failure_rate: float, recovery_rate: float) -> str | None:
+        """
+        Apply failure and recovery logic for this tick.
+
+        Failure model  : Bernoulli trial each tick — P(fail) = failure_rate * dt
+        Recovery model : Exponential recovery time drawn from Exp(recovery_rate)
+
+        Returns "failed", "recovered", or None for event logging.
+        """
+        self.failed = False
+        self.recovered = False
+
+        # If currently down, check for recovery
+        if not self.is_active:
+            if current_time >= self.recovery_time:
+                self.is_active = True
+                self.recovered = True
+                self.recovery_time = None
+                return "recovered"
+            return None
+
+        # If currently up, check for failure
+        if random.random() < failure_rate:
+            self.is_active = False
+            self.failed = True
+            self.total_failures += 1
+
+            # Draw recovery time from exponential distribution
+            recovery_duration = random.expovariate(recovery_rate)
+            self.recovery_time = current_time + recovery_duration
+
+            # Drop any in-progress request back to queue front
+            if self.current_request is not None:
+                self.queue.appendleft(self.current_request)
+                self.current_request = None
+
+            return "failed"
+
+        return None
+
     def __repr__(self) -> str:
         status = "busy" if self.is_busy() else "idle"
         return (
