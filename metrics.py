@@ -29,6 +29,7 @@ class MetricsCollector:
         self.dropped_requests: int = 0
         self.total_response_time: float = 0.0
         self.response_times: list[float] = []
+        self.failures = 0
 
     # ------------------------------------------------------------------------------
     # Recording
@@ -46,6 +47,10 @@ class MetricsCollector:
     def record_drop(self, request: ClientRequest) -> None:
         """Register a reqest dropped due to timeout."""
         self.dropped_requests += 1
+
+    def record_failure(self) -> None:
+        """Register a server failure event."""
+        self.failures += 1
 
     # ------------------------------------------------------------------------------
     # Derived statistics
@@ -80,6 +85,30 @@ class MetricsCollector:
         idx = max(0, int(len(sorted_rt) * p / 100) - 1)
         return sorted_rt[idx]
     
+    def compute_summary(self) -> dict:
+        """
+        Return a dictionary of key simulation metrics.
+        """
+        if not self.response_times:
+            return {
+                "completed": self.completed_requests,
+                "avg_response_time": 0.0,
+                "p95_response_time": 0.0,
+                "dropped": self.dropped_requests,
+                "failures": self.failures,
+            }
+
+        avg = sum(self.response_times) / len(self.response_times)
+        sorted_times = sorted(self.response_times)
+        p95 = sorted_times[int(0.95 * len(sorted_times))]
+
+        return {
+            "completed": self.completed_requests,
+            "avg_response_time": avg,
+            "p95_response_time": p95,
+            "dropped": self.dropped_requests,
+            "failures": self.failures,
+    }
     # ------------------------------------------------------------------------------
     # Reporting
     # ------------------------------------------------------------------------------
@@ -94,12 +123,13 @@ class MetricsCollector:
         print(f"  Completed requests      : {self.completed_requests}")
         print(f"  Dropped requests        : {self.dropped_requests}")
         print(f"  Drop rate               : {self.drop_rate:.2%}")
+        print(f"  Server failures         : {self.failures}")
         print(f"  Avg response time       : {self.average_response_time:.4f} time units")
         if self.response_times:
             print(f"  Median response time          : {self.percentile(50):.4f} time units")
             print(f"  95th percentile response time : {self.percentile(95):.4f} time units")
         if utilization is not None:
-            print(f"  Theoretical utilisation : ρ = {utilization:.4f}")
+            print(f"  Theoretical utilisation : rho = {utilization:.4f}")
         print(separator)
 
     def __repr__(self) -> str:
