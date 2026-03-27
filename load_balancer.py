@@ -49,6 +49,9 @@ class LoadBalancer:
         else:   # least_loaded
             target = self._least_loaded()
 
+        if target is None:
+            return None
+
         target.enqueue(request)
         return target
     
@@ -61,7 +64,10 @@ class LoadBalancer:
         Round Robin - deterministically cycle through servers.
         Pointer advances modulo the number of servers.
         """
-        server = self.servers[self._rr_index % len(self.servers)]
+        active_servers = [s for s in self.servers if s.is_active]
+        if not active_servers:                                       
+            return None                                              
+        server = active_servers[self._rr_index % len(active_servers)]
         self._rr_index += 1
         return server
     
@@ -72,7 +78,10 @@ class LoadBalancer:
         """
         # queue_length counts *waiting requests; does not include the request 
         # currently in service, matching the theoretical mdoel.
-        return min(self.servers, key = lambda s: s.queue_length())
+        active_servers = [s for s in self.servers if s.is_active]
+        if not active_servers:
+            return None
+        return min(active_servers, key=lambda s: len(s.queue))
     
     # ------------------------------------------------------------------------------
     # Diagnostics
