@@ -1,0 +1,7 @@
+{
+    "completed": 3918,
+    "avg_response_time": 300.07231090767186,
+    "p95_response_time": 570.0,
+    "dropped": 0,
+    "failures": 237
+}
