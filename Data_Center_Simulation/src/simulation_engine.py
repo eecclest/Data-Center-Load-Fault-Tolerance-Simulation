@@ -43,11 +43,14 @@ class SimulationEngine:
     def __init__(
             self, num_servers, arrival_rate, service_rate,
                  failure_rate, recovery_rate, algorithm,
-                 simulation_time, seed, run_id
+                 simulation_time, seed, run_id,dt=1.0, 
+                 request_timeout=float("inf") 
     ):
         if seed is not None:
             np.random.seed(seed)
 
+        self.run_id = run_id
+        self.algorithm = algorithm
         self.num_servers = num_servers
         self.arrival_rate = arrival_rate
         self.service_rate = service_rate
@@ -55,11 +58,10 @@ class SimulationEngine:
         self.recovery_rate = recovery_rate
         self.simulation_time = simulation_time
         self.sim_duration = simulation_time
-        self.run_id = run_id
 
-        self.dt = 1.0
+        self.dt = dt
         self.clock = 0.0
-        self.request_timeout = float("inf")
+        self.request_timeout = request_timeout
 
         self.timeseries_data = []
         self.event_log = []
@@ -74,6 +76,10 @@ class SimulationEngine:
         ]
         self.load_balancer = LoadBalancer(self.servers, algorithm=algorithm)
         self.metrics = MetricsCollector()
+
+        self._queue_depth_history: list[list[int]] = [[] for _ in self.servers]
+        self._busy_ticks: list[int] = [0] * num_servers
+        self._total_ticks: int = 0
 
     # ------------------------------------------------------------------------------
     # Main simulation loop
@@ -101,6 +107,7 @@ class SimulationEngine:
 
         for _ in range(num_ticks):
             self.clock += self.dt
+            self._total_ticks += 1
 
             # 1. Apply failure/recovery model to each server
             for server in self.servers:
@@ -121,7 +128,7 @@ class SimulationEngine:
             for _ in range(num_arrivals):
                 req = ClientRequest(
                     arrival_time = self.clock,
-                    service_time = 0,
+                    service_time = float(np.random.exponential(1.0 / self.service_rate)),
                     timeout = self.request_timeout,
                 )
                 result = self.load_balancer.dispatch(req)
@@ -139,13 +146,17 @@ class SimulationEngine:
                     self.event_log.append(("dropped", self.clock))
             
             # 4. Advance each server by one tick (now skips failed servers)
-            for server in self.servers:
+            for i, server in enumerate(self.servers):
                 if not server.is_active:
                     continue
-                completed = server.tick(self.clock)
-                for req in completed:
+                if server.is_busy():
+                    self._busy_ticks[i] += 1
+                for req in server.tick(self.clock):
                     self.metrics.record_completion(req)
                     self.event_log.append(("completion", self.clock))
+
+            for i, server in enumerate(self.servers):
+                self._queue_depth_history[i].append(server.queue_length())
 
             total_queue_length = sum(len(s.queue) for s in self.servers)
             active_servers = sum(1 for s in self.servers if s.is_active)
@@ -199,6 +210,60 @@ class SimulationEngine:
                 req.completion_time = req.completion_time or self.clock
                 self.metrics.record_completion(req)
                 server.current_request = None
+
+    def per_server_utilization(self) -> list[float]:
+        if self._total_ticks == 0:
+            return [0.0] * len(self.servers)
+        return [b / self._total_ticks for b in self._busy_ticks]
+
+    def avg_queue_depth_per_server(self) -> list[float]:
+        result = []
+        for history in self._queue_depth_history:
+            result.append(float(np.mean(history)) if history else 0.0)
+        return result
+
+    def max_queue_depth_per_server(self) -> list[int]:
+        return [int(max(h)) if h else 0 for h in self._queue_depth_history]
+
+    def queue_depth_history(self) -> list[list[int]]:
+        return self._queue_depth_history
+
+    def results(self) -> dict:
+        psu = self.per_server_utilization()
+        aqd = self.avg_queue_depth_per_server()
+        mqd = self.max_queue_depth_per_server()
+        m = self.metrics
+        return {
+            "run_id": self.run_id,
+            "algorithm": self.algorithm,
+            "parameters": {
+                "num_servers": len(self.servers),
+                "arrival_rate": self.arrival_rate,
+                "service_rate": self.service_rate,
+                "sim_duration": self.sim_duration,
+                "request_timeout": (
+                    self.request_timeout if self.request_timeout != float("inf") else "inf"
+                ),
+            },
+            "metrics": {
+                "total_requests": m.total_requests,
+                "completed_requests": m.completed_requests,
+                "dropped_requests": m.dropped_requests,
+                "drop_rate": round(m.drop_rate, 6),
+                "avg_response_time": round(m.average_response_time, 6),
+                "median_response_time": round(m.percentile(50), 6),
+                "p95_response_time": round(m.percentile(95), 6),
+                "theoretical_utilization": round(self.utilization, 6),
+            },
+            "per_server": {
+                f"server_{i}": {
+                    "empirical_utilization": round(psu[i], 6),
+                    "avg_queue_depth": round(aqd[i], 6),
+                    "max_queue_depth": mqd[i],
+                }
+                for i in range(len(self.servers))
+            },
+        }
 
     def summary(self) -> None:
         """Prit metrics report with utilisation context."""
