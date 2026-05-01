@@ -199,7 +199,7 @@ significance.
 | Overload | 6.0 | 3 | 1.333 | 46.922 | 55.36% |
 | Server Failure | 2.0 | 1 | 1.333 | 46.511 | 52.95% |
 
----
+```
 
 ## Architecture Overview
 ┌──────────────────────────────────────────────────────┐
@@ -238,6 +238,7 @@ significance.
 │  - response_time  │
 └───────────────────┘
 
+```
 ### Component Responsibilities
 
 | Class | File | Role |
@@ -250,7 +251,7 @@ significance.
 
 See `docs/UML_Activity_Diagram_Updated.png` for the full activity diagram.
 
----
+```
 
 ## Project Structure
 Data_Center_Simulation/
@@ -276,7 +277,7 @@ Data_Center_Simulation/
 ├── README.md
 └── .gitignore
 
----
+```
 
 ## Milestone Status
 
@@ -302,7 +303,6 @@ Data_Center_Simulation/
 - [x] Ten matplotlib figures for report and presentation
 - [x] Full statistical summary exported to JSON
 
----
 
 ## Dependencies
 
