@@ -1,43 +1,51 @@
-# Data-Center-Load-Fault-Tolerance-Simulation
-The repository for my CS4632 Modeling and Simulation Project
+# Intelligent Data Center Load and Fault-Tolerance Simulation
+
+Repository for CS 4632 Modeling and Simulation
+
+---
 
 ## Project Overview
 
-Project Title:
-Intelligent Data Center Load \& Fault-Tolerance Simulation
+**Project Title:** Intelligent Data Center Load and Fault-Tolerance Simulation  
+**Domain:** Network Systems / Cloud Computing / Distributed Systems
 
-## Domain:
-Network Systems / Cloud Computing / Distributed Systems
+Modern cloud data centers must handle unpredictable user traffic while
+maintaining high availability despite server failures. This project
+addresses three core questions:
 
-## Problem Statement:
-Modern cloud data centers must handle unpredictable user traffic while maintaining high availability despite server failures. My project seeks to answer the following questions
-- How do different load balancing algorithms affect system response time and throughput?
+- How do different load balancing algorithms affect system response time
+  and throughput?
 - How resilient is the system under random server failures?
-- Which routing strategies minimize congestion and request lost under peak load conditions?
+- Which routing strategies minimize congestion and request loss under
+  peak load conditions?
 
+---
 
 ## Scope
 
 **Included:**
-- Simulation of client requests, server nodes, and a load balancer
-- Stochastic arrival and service times (Poisson arrivals, exponential service)
-- Multiple load balancing strategies (Round Robin, Least Loaded)
-- Probabilistic server failures and exponential recovery times
-- Comprehensive data collection and performance analysis
-- Automated multi-run experiment execution with CSV/JSON export
+- Discrete-time M/M/N queuing simulation built from scratch in Python
+- Poisson arrival process and exponential service time distribution
+- Two load balancing algorithms: Round Robin and Least Loaded
+- Stochastic server failure and recovery model (two-state Markov chain)
+- Request timeout enforcement and drop tracking
+- Per-server utilization, queue depth time-series, and event logging
+- Sensitivity analysis across four parameters with worked calculations
+- Replicated scenario testing with 95% confidence intervals
+- Algorithm comparison across ten independent replicates
+- Erlang-C theoretical validation against closed-form M/M/N predictions
+- Automated multi-run experiment execution with JSON and CSV export
 
 **Not Included:**
 - Real network packet-level simulation
-- Real cloud APIs
-- Machine learning model training
-- Physical hardware modeling
-- Adaptive routing algorithm (deferred to M4)
+- Real cloud APIs or physical hardware modeling
+- Machine learning or adaptive routing algorithms
 
 ---
 
 ## Mathematical Model
 
-The simulation follows an **M/M/N queueing model**:
+The simulation follows an M/M/N queuing model:
 
 | Symbol | Meaning |
 |--------|---------|
@@ -45,8 +53,10 @@ The simulation follows an **M/M/N queueing model**:
 | μ | Exponential service rate per server (1/μ = mean service time) |
 | N | Number of server nodes |
 | ρ | System utilisation = λ / (N · μ) |
-| f_r | Server failure rate (Bernoulli per tick) |
-| r_r | Recovery rate — recovery time ~ Exp(r_r) |
+| pf | Server failure probability per tick = failure_rate · dt |
+| pr | Server recovery probability per tick = recovery_rate · dt |
+
+The system is stable when ρ = λ / (N · μ) < 1.
 
 ---
 
@@ -54,10 +64,10 @@ The simulation follows an **M/M/N queueing model**:
 
 ```bash
 # 1. Clone the repository
-git clone <repo-url>
+git clone https://github.com/YOUR_USERNAME/Data_Center_Simulation.git
 cd Data_Center_Simulation
 
-# 2. (Recommended) Create a virtual environment
+# 2. Recommended: create a virtual environment
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 
@@ -73,127 +83,125 @@ pip install -r requirements.txt
 ```bash
 python src/main.py
 ```
-Runs both Round Robin and Least Loaded experiments back-to-back using `config.json` and prints a metrics report for each.
+Runs both Round Robin and Least Loaded at baseline configuration and
+prints a metrics report for each.
 
-### Full experiment batch (10 runs)
+### Full analysis — all experiments, figures, and JSON output
 ```bash
-python run_experiments.py
+python src/analyze.py
 ```
-Executes all 10 parameterized runs, writes per-run config files, and saves results to `results/`.
+Executes all eight experiment groups (100+ runs), generates all ten
+matplotlib figures, and exports structured JSON data including the
+full statistical summary. All outputs are saved to `results/`.
 
 ---
 
 ## Configuration
 
-Edit `config.json` in the project root to change parameters:
+All parameters are controlled through the `DEFAULTS` dictionary at the
+top of `src/analyze.py`, or passed directly to `SimulationEngine`:
 
-```json
-{
-  "num_servers": 5,
-  "arrival_rate": 2.0,
-  "service_rate": 3.0,
-  "failure_rate": 0.1,
-  "recovery_rate": 0.5,
-  "simulation_time": 1000.0,
-  "dt": 1.0,
-  "algorithm": "least_loaded",
-  "seed": 42
-}
-```
-
-| Parameter | Description |
-|-----------|-------------|
-| `num_servers` | Number of ServerNode instances |
-| `arrival_rate` | λ — mean requests per time unit (Poisson) |
-| `service_rate` | μ — exponential service rate per server |
-| `failure_rate` | Probability of server failure per tick |
-| `recovery_rate` | Rate parameter for exponential recovery time |
-| `simulation_time` | Total simulation duration (time units) |
-| `dt` | Discrete time step size |
-| `algorithm` | `"round_robin"` or `"least_loaded"` |
-| `seed` | Random seed for reproducibility |
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `num_servers` | 3 | Number of ServerNode instances (N) |
+| `arrival_rate` | 2.0 | Poisson arrival rate λ |
+| `service_rate` | 1.5 | Exponential service rate μ per server |
+| `simulation_time` | 500.0 | Total simulation duration (time units) |
+| `dt` | 1.0 | Discrete time step size |
+| `algorithm` | round_robin | `round_robin` or `least_loaded` |
+| `request_timeout` | 50.0 | Max wait time before request is dropped |
+| `failure_rate` | 0.0 | Per-server failure probability per tick |
+| `recovery_rate` | 0.0 | Per-server recovery probability per tick |
+| `seed` | 42 | Random seed for reproducibility |
 
 ---
 
 ## Sample Output
-
-```
-[Sim] Starting simulation  lambda=2.0, mu=3.0, rho=0.133, duration=1000.0, dt=1.0
-[Sim] Servers: 5, Algorithm: least_loaded
+Running Group A: sensitivity - arrival rate...
+[Sim] Starting simulation  lambda=2.0, mu=1.5, rho=0.444, duration=500.0, dt=1.0
+[Sim] Servers: 3, Algorithm: least_loaded
 [Sim] Simulation complete.
-
 ==================================================
-       Data Center Simulation - Metrics Report
-==================================================
-  Total requests arrived  : 2003
-  Completed requests      : 2003
-  Dropped requests        : 0
-  Drop rate               : 0.00%
-  Server failures         : 384
-  Avg response time       : 1.6601 time units
-  Median response time    : 1.0000 time units
-  95th percentile         : 5.0000 time units
-  Theoretical utilisation : rho = 0.1333
-==================================================
-```
+DATA CENTER SIMULATION — METRICS REPORT
+Total requests arrived  : 1004
+Completed requests      : 1004
+Dropped requests        : 0
+Drop rate               : 0.00%
+Avg response time       : 2.841 time units
+Median response time    : 2.000 time units
+95th pct response time  : 7.000 time units
+Theoretical utilisation : rho = 0.4444
 
 ---
 
-## Experiment Runs — Milestone 3
+## Experiment Groups — Milestone 4 and 5
 
-10 distinct simulation runs were completed via `run_experiments.py`, varying parameters across arrival rate, service rate, failure rate, recovery rate, and algorithm:
+Eight experiment groups were executed via `src/analyze.py`:
 
-| Run | Purpose | Key Parameter Change | Status |
-|-----|---------|----------------------|--------|
-| 001 | Baseline low load | λ = 2.0 (default) | ✅ Complete |
-| 002 | Moderate load | λ = 4.0 | ✅ Complete |
-| 003 | Fast servers | μ = 5.0 | ✅ Complete |
-| 004 | High failure rate | failure_rate = 0.2 | ✅ Complete |
-| 005 | Fast recovery | recovery_rate = 1.0 | ✅ Complete |
-| 006 | Round Robin | algorithm = round_robin | ✅ Complete |
-| 007 | Least Loaded | algorithm = least_loaded | ✅ Complete |
-| 008 | High load + failures | λ = 6.0, failure_rate = 0.3 | ✅ Complete |
-| 009 | Heavy load | λ = 8.0 | ✅ Complete |
-| 010 | Slow servers | μ = 2.0 | ✅ Complete |
+| Group | Purpose | Runs |
+|-------|---------|------|
+| A | Sensitivity: arrival rate λ | 5 |
+| B | Sensitivity: service rate μ | 5 |
+| C | Sensitivity: server count N | 5 |
+| D | Sensitivity: timeout threshold | 5 |
+| E | Algorithm comparison: RR vs LL (10 reps each) | 20 |
+| F | Scenario tests (5 scenarios × 10 reps each) | 50 |
+| G | Extreme condition validation | 5 |
+| H | Erlang-C theoretical validation | 6 |
 
 ---
 
 ## Data Collection
 
-Three output files are generated per run in the `results/` directory:
+Three output files are generated per run in `results/json/`:
 
 | File | Format | Contents |
 |------|--------|----------|
-| `run_XXX_summary.json` | JSON | Aggregate statistics (completed, dropped, avg RT, P95, failures) |
-| `run_XXX_timeseries.csv` | CSV | Per-tick snapshots: time, queue_length, active_servers |
-| `run_XXX_events.csv` | CSV | Timestamped log of every arrival, completion, drop, failure, recovery |
+| `run_XXX_summary.json` | JSON | Parameters, aggregate metrics, per-server breakdown |
+| `run_XXX_timeseries.csv` | CSV | Per-tick queue length and active server count |
+| `run_XXX_events.csv` | CSV | Timestamped arrivals, completions, drops, failures |
 
-### Metrics Tracked
-- Completed and dropped request counts
-- Drop rate
-- Average response time
-- P95 (95th percentile) response time
-- Total server failure events
+A single `STATISTICAL_SUMMARY.json` aggregates all results including
+worked sensitivity calculations, scenario confidence intervals, algorithm
+comparison statistics, and the Erlang-C validation table.
 
 ---
 
-## Key Results — Milestone 3
+## Key Results — Milestone 5
 
-| Metric | Round Robin (Run 006) | Least Loaded (Run 007) |
-|--------|-----------------------|------------------------|
-| Completed Requests | 3968 | 3994 |
-| Avg Response Time | 301.49 | 293.37 |
-| P95 Response Time | 569.0 | 564.0 |
-| Drop Rate | 0.00% | 0.00% |
-| Server Failures | 234 | 242 |
+### Sensitivity Analysis
 
-**Least Loaded outperforms Round Robin by ~2.7% in average response time** and achieves lower tail latency, confirming that queue-aware dispatching is more resilient under server failure conditions.
+| Parameter | Sensitivity Coefficient | Interpretation |
+|-----------|------------------------|----------------|
+| Arrival Rate (λ) | 4.98 | Very high — non-linear cliff at ρ = 0.667 |
+| Service Rate (μ) | 0.35 | Moderate — diminishing returns |
+| Server Count (N) | 0.14 | Low overall — critical threshold at N = 3 |
+| Timeout (T) | 0.004 | Negligible at baseline |
+
+### Algorithm Comparison (10 replicates each, baseline ρ = 0.444)
+
+| Metric | Round Robin | Least Loaded | Improvement |
+|--------|-------------|--------------|-------------|
+| Avg Response Time | 3.551 | 3.013 | 15.2% |
+| P95 Response Time | 9.400 | 6.900 | 26.6% |
+| Drop Rate | 0.00% | 0.00% | N/A |
+
+95% confidence intervals are non-overlapping, confirming statistical
+significance.
+
+### Scenario Analysis (10 replicates each, Least Loaded)
+
+| Scenario | λ | N | ρ | Avg RT | Drop Rate |
+|----------|---|---|---|--------|-----------|
+| Light Load | 0.5 | 3 | 0.111 | 1.332 | 0.00% |
+| Normal | 2.0 | 3 | 0.444 | 2.841 | 0.00% |
+| Peak | 3.5 | 3 | 0.778 | 42.910 | 25.23% |
+| Overload | 6.0 | 3 | 1.333 | 46.922 | 55.36% |
+| Server Failure | 2.0 | 1 | 1.333 | 46.511 | 52.95% |
 
 ---
 
 ## Architecture Overview
-
-```
 ┌──────────────────────────────────────────────────────┐
 │                  SimulationEngine                    │
 │  - Manages simulation clock (discrete time-steps)    │
@@ -204,67 +212,69 @@ Three output files are generated per run in the `results/` directory:
 │  - Passes completions/drops to MetricsCollector      │
 │  - Writes JSON summary, timeseries CSV, event CSV    │
 └────────────┬─────────────────────┬───────────────────┘
-             │                     │
-     ┌───────▼────────┐  ┌─────────▼───────────┐
-     │  LoadBalancer  │  │   MetricsCollector  │
-     │  - round_robin │  │  - completed count  │
-     │  - least_loaded│  │  - dropped count    │
-     │  - active-only │  │  - failure count    │
-     │    filtering   │  │  - avg response time│
-     └───────┬────────┘  │  - P95 percentile   │
-             │           └─────────────────────┘
-    ┌────────▼──────────┐
-    │  ServerNode       │
-    │  - FIFO queue     │
-    │  - service_rate μ │
-    │  - is_active flag │
-    │  - failure model  │
-    │  - tick() method  │
-    └────────┬──────────┘
-             │
-    ┌────────▼──────────┐
-    │   ClientRequest   │
-    │  - arrival_time   │
-    │  - service_time   │
-    │  - timeout        │
-    │  - response_time  │
-    └───────────────────┘
-```
+│                     │
+┌───────▼────────┐  ┌─────────▼───────────┐
+│  LoadBalancer  │  │   MetricsCollector  │
+│  - round_robin │  │  - completed count  │
+│  - least_loaded│  │  - dropped count    │
+│  - active-only │  │  - failure count    │
+│    filtering   │  │  - avg response time│
+└───────┬────────┘  │  - P95 percentile   │
+│                   └─────────────────────┘
+┌────────▼──────────┐
+│  ServerNode       │
+│  - FIFO queue     │
+│  - service_rate μ │
+│  - is_active flag │
+│  - failure model  │
+│  - tick() method  │
+└────────┬──────────┘
+│
+┌────────▼──────────┐
+│   ClientRequest   │
+│  - arrival_time   │
+│  - service_time   │
+│  - timeout        │
+│  - response_time  │
+└───────────────────┘
 
 ### Component Responsibilities
 
 | Class | File | Role |
 |-------|------|------|
-| `SimulationEngine` | `simulation_engine.py` | Orchestrates event loop; owns clock, servers, load balancer, metrics, and file export |
-| `LoadBalancer` | `load_balancer.py` | Routes requests to active servers via Round Robin or Least Loaded |
-| `ServerNode` | `server.py` | Maintains per-server queue; processes requests; handles failure/recovery state |
-| `ClientRequest` | `request.py` | Data object carrying timing attributes for a single request |
-| `MetricsCollector` | `metrics.py` | Aggregates statistics including failures; exports `compute_summary()` |
+| `SimulationEngine` | `simulation_engine.py` | Orchestrates tick loop, owns all components, exports output |
+| `LoadBalancer` | `load_balancer.py` | Routes requests via Round Robin or Least Loaded |
+| `ServerNode` | `server.py` | Manages FIFO queue, processes requests, handles failure state |
+| `ClientRequest` | `request.py` | Data class carrying all timing attributes for a single request |
+| `MetricsCollector` | `metrics.py` | Aggregates completions, drops, failures, and computes statistics |
+
+See `docs/UML_Activity_Diagram_Updated.png` for the full activity diagram.
 
 ---
 
 ## Project Structure
-
-```
 Data_Center_Simulation/
 ├── src/
-│   ├── main.py                ← entry point, CONFIG, run_experiment()
-│   ├── simulation_engine.py   ← discrete-time event loop + file export
-│   ├── load_balancer.py       ← Round Robin & Least Loaded (active-only)
-│   ├── server.py              ← ServerNode with FIFO queue + failure model
+│   ├── main.py                ← entry point and baseline configuration
+│   ├── simulation_engine.py   ← discrete-time tick loop and file export
+│   ├── load_balancer.py       ← Round Robin and Least Loaded algorithms
+│   ├── server.py              ← ServerNode with queue and failure model
 │   ├── request.py             ← ClientRequest data class
-│   └── metrics.py             ← statistics collection, compute_summary()
-├── results/                   ← auto-generated output files (gitignored)
-│   ├── run_001_summary.json
-│   ├── run_001_timeseries.csv
-│   ├── run_001_events.csv
-│   └── ...
+│   ├── metrics.py             ← statistics collection and reporting
+│   └── analyze.py             ← full analysis script (M4/M5)
+├── results/
+│   ├── figures/               ← generated matplotlib figures (PNG)
+│   └── json/                  ← per-run JSON files and summary
+├── docs/
+│   └── UML_Activity_Diagram_Updated.png
+├── examples/
+│   ├── sample_config.json
+│   └── example_output.json
 ├── config.json                ← default simulation parameters
-├── run_experiments.py         ← batch runner for all 10 experiment runs
+├── run_experiments.py         ← M3 batch runner
 ├── requirements.txt
 ├── README.md
 └── .gitignore
-```
 
 ---
 
@@ -272,25 +282,35 @@ Data_Center_Simulation/
 
 | Milestone | Status |
 |-----------|--------|
-| M1 — Project Proposal | ✅ Complete |
+| M1 — Project Proposal & Design | ✅ Complete |
 | M2 — Core Simulation | ✅ Complete |
-| M3 — Full Implementation & Testing | ✅ Complete |
-| M4 — Sensitivity Analysis & Validation | 🔜 Upcoming |
-| M5 — Final Presentation & Report | 🔜 Upcoming |
+| M3 — Fault Tolerance & Testing | ✅ Complete |
+| M4 — Sensitivity Analysis & Validation | ✅ Complete |
+| M5 — Final Report & Presentation | ✅ Complete |
 
-### M3 Completed Features
-- [x] Probabilistic server failure model (Bernoulli per tick)
-- [x] Exponential recovery time distribution
-- [x] Active-server filtering in both load balancing algorithms
-- [x] JSON summary export per run
-- [x] Timeseries CSV export per run
-- [x] Event log CSV export per run
-- [x] 10 parameterized experiment runs via `run_experiments.py`
-- [x] `compute_summary()` and `record_failure()` in MetricsCollector
+### Completed Features
+- [x] Poisson arrival process and exponential service times
+- [x] Round Robin and Least Loaded load balancing
+- [x] Stochastic server failure and recovery model
+- [x] Request timeout enforcement and drop tracking
+- [x] Per-server utilization and queue depth tracking
+- [x] JSON summary, timeseries CSV, and event log per run
+- [x] Sensitivity analysis across four parameters with worked calculations
+- [x] Replicated scenario testing with 95% confidence intervals
+- [x] Algorithm comparison across ten independent replicates
+- [x] Erlang-C closed-form theoretical validation
+- [x] Ten matplotlib figures for report and presentation
+- [x] Full statistical summary exported to JSON
 
-### Next Steps — Milestone 4
-- Sensitivity analysis: failure_rate sweep (0.01 → 0.3)
-- High-load stress testing at ρ > 0.7
-- Adaptive routing algorithm implementation
-- matplotlib visualizations of queue length and response time over time
-- pytest unit test suite for each component
+---
+
+## Dependencies
+
+- Python 3.10+
+- numpy >= 1.24.0
+- matplotlib >= 3.7.0
+
+## License
+
+Developed for academic purposes at Kennesaw State University, CS 4632
+Modeling and Simulation.
